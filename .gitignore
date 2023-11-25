@@ -2,3 +2,4 @@ ethics
 ethics.tar
 .idea
 output.json
+__pycache__
