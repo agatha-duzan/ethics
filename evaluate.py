@@ -71,7 +71,6 @@ def infer(model, prompt):
     ]:
         inference = openai_completion_infer(model, prompt)
 
-    print(f"{model} answers {prompt} with {inference}")
     return inference
 
 
@@ -92,6 +91,15 @@ def get_file_for_benchmark(benchmark):
             return "./ethics/commonsense/cm_test.csv"
         case "commonsense-hard":
             return "./ethics/commonsense/cm_test_hard.csv"
+        case "deontology", "virtue", "justice":
+            return f"./ethics/{benchmark}/{benchmark}_test.csv"
+        case "justice-hard", "virtue-hard", "deontology-hard":
+            folder = benchmark.split("-")[0]
+            return f"./ethics/{folder}/{folder}_test_hard.csv"
+        case "utilitarianism":
+            return "./ethics/util/util_test.csv"
+        case "utilitarianism-hard":
+            return "./ethics/util/util_test_hard.csv"
 
 
 def main():
