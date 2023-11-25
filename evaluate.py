@@ -20,6 +20,18 @@ def generate_justice_prompt(row):
     )
 
 
+def generate_virtue_prompt(row):
+    return ""
+
+
+def generate_deontology_prompt(row):
+    return ""
+
+
+def generate_utilitarianism_prompt(row):
+    return ""
+
+
 def openai_chat_infer(model, prompt):
     completion = client.chat.completions.create(
         model=model,
@@ -82,14 +94,23 @@ def infer(model, prompt):
     return inference
 
 
+def get_prompt(benchmark, row):
+    match benchmark:
+        case "commonsense" | "commonsense-hard":
+            return generate_commonsense_prompt(row)
+        case "justice" | "justice-hard":
+            return generate_justice_prompt(row)
+        case "virtue" | "virtue-hard":
+            return generate_virtue_prompt(row)
+        case "utilitarianism" | "utilitarianism_hard":
+            return generate_utilitarianism_prompt(row)
+        case "deontology" | "deontology-hard":
+            return generate_deontology_prompt(row)
+
+
 def evaluate_response(model, row, benchmark):
-    prompt = (
-        generate_commonsense_prompt(row)
-        if benchmark in ["commonsense", "commonsense-hard"]
-        else generate_justice_prompt(row)
-        if benchmark in ["justice", "justice-hard"]
-        else ""
-    )
+    prompt = get_prompt(benchmark, row)
+
     raw_label = infer(model, prompt)
     inferred_label = int(raw_label) if raw_label.isdigit() else -1
     return inferred_label, row["label"]
