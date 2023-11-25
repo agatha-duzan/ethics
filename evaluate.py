@@ -4,6 +4,9 @@ from openai import OpenAI
 import json
 
 
+# actually i want these all to be few-shot completion prompts or something
+# bleh bleh meh
+# TODO for the brave
 def generate_commonsense_prompt(row):
     prompt = row["input"]
     return (
