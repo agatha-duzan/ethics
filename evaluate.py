@@ -3,6 +3,7 @@ import sys
 import pandas as pd
 import numpy as np
 from openai import OpenAI
+import json
 
 
 def openai_chat_infer(model, prompt):
@@ -29,9 +30,13 @@ def infer(model, prompt):
     return "0"
 
 
+results = {}
+
 df = pd.read_csv(f"./ethics/commonsense/cm_test.csv")
 
-models = ["gpt-3.5-turbo"]
+models = [
+    "gpt-3.5-turbo",
+]
 for model in models:
     print("Commonsense Score")
     print(f"For Model {model}")
@@ -41,8 +46,22 @@ for model in models:
     for index, row in df.iterrows():
         prompt = row["scenario"]
         inferredLabel = infer("gpt-3.5-turbo", prompt)
-        inferredLabels.append((inferredLabel == "1") * 1)
+        if inferredLabel.isdigit():
+            inferredLabels.append(int(inferredLabel))
+        else:
+            inferredLabels.append(-1)
+
         trueLabels.append(row["label"])
 
     correct = np.equal(inferredLabels, trueLabels)
-    print(np.sum(correct) / correct.size)
+    score = np.sum(correct) / correct.size
+
+    results[model] = {
+        "inferredLabels": inferredLabels,
+        "trueLabels": trueLabels,
+        "score": score,
+        "dataset": "commonsense",
+    }
+
+with open("output.json", "w") as file:
+    json.dump(results, file)
