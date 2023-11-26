@@ -1,4 +1,6 @@
 import os
+
+import openai
 import pandas as pd
 import numpy as np
 from openai import OpenAI
@@ -10,17 +12,17 @@ import requests
 def get_benchmark_category(benchmark):
     split = benchmark.split("-")
     category = split[0]
-    hard = (split[1:2] == "hard") or False
+    hard = (split[1:2] == ["hard"]) or False
     return category, hard
 
 
-def generate_fewshot_prompts(benchmark):
+def generate_fewshot_prompts(benchmark, n_examples=10):
     train_data = get_file_for_benchmark(benchmark, test=False)
     df = pd.read_csv(f"{train_data}")
 
     rows = (
         (df[df["is_short"]] if benchmark == "commonsense" else df)
-        .sample(n=10)
+        .sample(n=n_examples)
         .iterrows()
     )
 
@@ -54,9 +56,9 @@ def generate_fewshot_prompts(benchmark):
     return "\n".join(fewshot_prompts)
 
 
-def generate_prompt(benchmark, row):
+def generate_prompt(benchmark, row, n_examples):
     prompt = row["input"]
-    return f"{generate_fewshot_prompts(benchmark)}\n{prompt} = "
+    return f"{generate_fewshot_prompts(benchmark, n_examples)}\n{prompt} = "
 
 
 def generate_justice_prompt(row):
@@ -90,8 +92,10 @@ def openai_chat_infer(model, prompt):
         )
 
         return completion.choices[0].message.content
-    except:
-        print("Whoops! There was an error!")
+    except openai.BadRequestError as err:
+        raise err
+    except Exception as err:
+        print(f"Error {err}, retrying.")
         return openai_chat_infer(model, prompt)
 
 
@@ -137,10 +141,10 @@ def infer(model, prompt):
     return inference
 
 
-def get_prompt(benchmark, row):
+def get_prompt(benchmark, row, n_examples=10):
     match benchmark:
         case "commonsense" | "commonsense-hard":
-            return generate_prompt(benchmark, row)
+            return generate_prompt(benchmark, row, n_examples)
         case "justice" | "justice-hard" | "virtue" | "virtue-hard":
             return generate_justice_prompt(row)
         case "deontology" | "deontology-hard":
@@ -149,12 +153,18 @@ def get_prompt(benchmark, row):
             return generate_utilitarianism_prompt(row)
 
 
-def evaluate_response(model, row, benchmark):
-    if benchmark != "utilitarianism":
-        prompt = get_prompt(benchmark, row)
-        raw_label = infer(model, prompt)
-        inferred_label = int(raw_label) if raw_label.isdigit() else -1
-        return inferred_label, row["label"]
+def evaluate_response(model, row, benchmark, n_examples=10):
+    if benchmark != "utilitarianism" and benchmark != "utilitarianism-hard":
+        try:
+            prompt = get_prompt(benchmark, row, n_examples)
+            raw_label = infer(model, prompt)
+            inferred_label = int(raw_label) if raw_label.isdigit() else -1
+            return inferred_label, row["label"]
+        except openai.BadRequestError as err:
+            print(
+                f"Bad request error {err}, retrying evaluate response with a different prompt."
+            )
+            return evaluate_response(model, row, benchmark, n_examples=n_examples - 1)
     else:
         prompt_1, prompt_2 = get_prompt(benchmark, row.iloc[0]), get_prompt(
             benchmark, row.iloc[1]
@@ -173,11 +183,11 @@ def get_file_for_benchmark(benchmark, test=True):
     split = "test" if test else "train"
     match category:
         case "commonsense":
-            return f"./ethics/commonsense/cm_{split}{'_hard' if hard else ''}.csv"
-        case "deontology" | "virtue" | "justice":
             return (
-                f"./ethics/{category}/{category}_{split}{'_hard' if hard else ''}.csv"
+                f"./ethics/commonsense/cm_{split}{'_hard' if test and hard else ''}.csv"
             )
+        case "deontology" | "virtue" | "justice":
+            return f"./ethics/{category}/{category}_{split}{'_hard' if test and hard else ''}.csv"
         case "utilitarianism":
             return f"./ethics/utilitarianism/util_{split}.csv"
 
@@ -187,7 +197,17 @@ def main():
     models = [
         "gpt-3.5-turbo",
     ]
-    benchmarks = ["commonsense", "deontology", "justice", "utilitarianism", "virtue"]
+    benchmarks = [
+        "commonsense",
+        "deontology",
+        "justice",
+        "virtue",
+        "utilitarianism" "commonsense-hard",
+        "deontology-hard",
+        "justice-hard",
+        "utilitarianism-hard",
+        "virtue-hard",
+    ]
 
     try:
         for benchmark in benchmarks:
@@ -199,11 +219,7 @@ def main():
 
                 inferred_labels, true_labels = [], []
 
-                for index, row in df.iterrows():
-                    if index == MAX_INDEX:
-                        break
-                    if index % 10 == 1:
-                        print(f"{index} / {min(MAX_INDEX, df.size)}")
+                for index, row in df.sample(MAX_INDEX, random_state=0).iterrows():
                     inferred_label, true_label = evaluate_response(
                         model, row, benchmark
                     )
@@ -238,5 +254,5 @@ try:
 except:
     print("OpenAI client not set up, OpenAI endpoints will not work.")
 
-MAX_INDEX = 30
+MAX_INDEX = 100
 main()
