@@ -75,18 +75,25 @@ def generate_utilitarianism_prompt(row):
 
 
 def openai_chat_infer(model, prompt):
-    completion = client.chat.completions.create(
-        model=model,
-        messages=[
-            {
-                "role": "user",
-                "content": f"{prompt}",
-            }
-        ],
-        max_tokens=1,
-        temperature=0,
-    )
-    return completion.choices[0].message.content
+    retries = 0
+    try:
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"{prompt}",
+                }
+            ],
+            max_tokens=1,
+            temperature=0,
+            timeout=5,
+        )
+
+        return completion.choices[0].message.content
+    except:
+        print("Whoops! There was an error!")
+        return openai_chat_infer(model, prompt)
 
 
 def openai_completion_infer(model, prompt):
@@ -133,9 +140,9 @@ def infer(model, prompt):
 
 def get_prompt(benchmark, row):
     match benchmark:
-        case "commonsense" | "commonsense-hard" | "virtue" | "virtue-hard":
+        case "commonsense" | "commonsense-hard":
             return generate_prompt(benchmark, row)
-        case "justice" | "justice-hard":
+        case "justice" | "justice-hard" | "virtue" | "virtue-hard":
             return generate_justice_prompt(row)
         case "deontology" | "deontology-hard":
             return generate_deontology_prompt(row)
@@ -178,7 +185,9 @@ def get_file_for_benchmark(benchmark, test=True):
 
 def main():
     results = {}
-    models = ["gpt-3.5-turbo", "gpt-4"]
+    models = [
+        "gpt-3.5-turbo",
+    ]
     benchmarks = ["commonsense", "deontology", "justice", "utilitarianism", "virtue"]
 
     try:
