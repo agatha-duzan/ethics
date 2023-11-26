@@ -1,8 +1,10 @@
+import os
 import pandas as pd
 import numpy as np
 from openai import OpenAI
 import json
-from config import OPENAI_CHAT_MODELS, OPENAI_COMPLETION_MODELS
+from config import OPENAI_CHAT_MODELS, OPENAI_COMPLETION_MODELS, HUGGINGFACE_HUB_MODELS
+import requests
 
 
 def get_benchmark_category(benchmark):
@@ -15,7 +17,7 @@ def get_benchmark_category(benchmark):
 def generate_fewshot_prompts(benchmark):
     train_data = get_file_for_benchmark(benchmark, test=False)
     df = pd.read_csv(f"{train_data}")
-    rows = df.sample(n=5).iterrows()
+    rows = df.sample(n=10).iterrows()
     fewshot_prompts = []
     match get_benchmark_category(benchmark)[0]:
         case "commonsense":
@@ -73,11 +75,30 @@ def openai_completion_infer(model, prompt):
     completion = client.completions.create(
         model=model, prompt=f"{prompt}", max_tokens=1, temperature=0
     )
-    return completion.choices[0].text[-1]
+    return completion.choices[0].text
 
 
-def huggingface_infer():
-    return "0"
+def huggingface_infer(model, prompt):
+    headers = {"Authorization": f"Bearer {os.environ['HUGGINGFACE_API_KEY']}"}
+
+    output = requests.post(
+        f"https://api-inference.huggingface.co/models/{model}",
+        headers=headers,
+        json={
+            "inputs": f"{prompt}",
+            "options": {"wait_for_model": True},
+            "parameters": {
+                "return_full_text": False,
+                "max_new_tokens": 1,
+            },
+        },
+    ).json()
+
+    try:
+        inference = output[0]["generated_text"]
+        return inference
+    except:
+        print(output)
 
 
 def infer(model, prompt):
@@ -86,6 +107,8 @@ def infer(model, prompt):
         inference = openai_chat_infer(model, prompt)
     elif model in OPENAI_COMPLETION_MODELS:
         inference = openai_completion_infer(model, prompt)
+    elif model in HUGGINGFACE_HUB_MODELS:
+        inference = huggingface_infer(model, prompt)
 
     return inference
 
@@ -123,8 +146,8 @@ def get_file_for_benchmark(benchmark, test=True):
 
 def main():
     results = {}
-    models = ["text-davinci-003"]
-    benchmarks = ["justice"]
+    models = ["gpt-3.5-turbo"]
+    benchmarks = ["justice", "commonsense", "deontology", "virtue"]
 
     try:
         for benchmark in benchmarks:
@@ -139,6 +162,8 @@ def main():
                 for index, row in df.iterrows():
                     if index == MAX_INDEX:
                         break
+                    if index % 10 == 1:
+                        print(f"{index} / {min(MAX_INDEX, df.size)}")
                     inferred_label, true_label = evaluate_response(
                         model, row, benchmark
                     )
@@ -157,6 +182,12 @@ def main():
                     results[model][benchmark] = formatted_results
                 else:
                     results[model] = {f"{benchmark}": formatted_results}
+
+                path = f"results/{benchmark}/{model}/output.json"
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w") as file:
+                    json.dump(results[model][benchmark], file)
+
     finally:
         with open("output.json", "w") as file:
             json.dump(results, file)
@@ -167,5 +198,5 @@ try:
 except:
     print("OpenAI client not set up, OpenAI endpoints will not work.")
 
-MAX_INDEX = 5
+MAX_INDEX = 1_000_000_000
 main()

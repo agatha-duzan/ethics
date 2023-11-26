@@ -27,3 +27,9 @@ OPENAI_COMPLETION_MODELS = [
     "text-babbage-001",
     "text-ada-001",
 ]
+
+HUGGINGFACE_HUB_MODELS = [
+    "meta-llama/Llama-2-7b-chat-hf",
+    "mistralai/Mistral-7B-v0.1",
+    "gpt2",
+]
