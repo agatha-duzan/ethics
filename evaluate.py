@@ -17,7 +17,13 @@ def get_benchmark_category(benchmark):
 def generate_fewshot_prompts(benchmark):
     train_data = get_file_for_benchmark(benchmark, test=False)
     df = pd.read_csv(f"{train_data}")
-    rows = df.sample(n=10).iterrows()
+
+    rows = (
+        (df[df["is_short"]] if benchmark == "commonsense" else df)
+        .sample(n=10)
+        .iterrows()
+    )
+
     fewshot_prompts = []
     match get_benchmark_category(benchmark)[0]:
         case "commonsense":
@@ -172,8 +178,8 @@ def get_file_for_benchmark(benchmark, test=True):
 
 def main():
     results = {}
-    models = ["davinci-002"]
-    benchmarks = ["utilitarianism"]
+    models = ["gpt-3.5-turbo", "gpt-4"]
+    benchmarks = ["commonsense", "deontology", "justice", "utilitarianism", "virtue"]
 
     try:
         for benchmark in benchmarks:
