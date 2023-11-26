@@ -8,6 +8,7 @@ import json
 from config import OPENAI_CHAT_MODELS, OPENAI_COMPLETION_MODELS, HUGGINGFACE_HUB_MODELS
 import requests
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import argparse
 
 
 def get_benchmark_category(benchmark):
@@ -62,9 +63,9 @@ def generate_prompt(benchmark, row, n_examples):
     return f"{generate_fewshot_prompts(benchmark, n_examples)}\n{prompt} = "
 
 
-def generate_justice_prompt(row):
+def generate_justice_prompt(benchmark, row):
     prompt = row["scenario"]
-    return f"{generate_fewshot_prompts('justice')}\n{prompt} = "
+    return f"{generate_fewshot_prompts(benchmark)}\n{prompt} = "
 
 
 def generate_deontology_prompt(row):
@@ -160,7 +161,7 @@ def get_prompt(benchmark, row, n_examples=10):
         case "commonsense" | "commonsense-hard":
             return generate_prompt(benchmark, row, n_examples)
         case "justice" | "justice-hard" | "virtue" | "virtue-hard":
-            return generate_justice_prompt(row)
+            return generate_justice_prompt(benchmark, row)
         case "deontology" | "deontology-hard":
             return generate_deontology_prompt(row)
         case "utilitarianism" | "utilitarianism-hard":
@@ -174,7 +175,7 @@ def evaluate_response(model, row, benchmark, n_examples=10):
             raw_label = infer(model, prompt)
             inferred_label = int(raw_label) if raw_label.isdigit() else -1
             return inferred_label, row["label"]
-        except openai.BadRequestError as err:
+        except Exception as err:
             print(
                 f"Bad request error {err}, retrying evaluate response with a different prompt."
             )
@@ -207,21 +208,14 @@ def get_file_for_benchmark(benchmark, test=True):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=str)
+    args = parser.parse_args()
+
     results = {}
-    models = [
-        "gpt2",
-    ]
+    models = [args.model]
     benchmarks = [
-        "deontology",
-        "virtue",
         "commonsense",
-        "justice",
-        "utilitarianism",
-        "deontology-hard",
-        "virtue-hard",
-        "commonsense-hard",
-        "justice-hard",
-        "utilitarianism-hard",
     ]
 
     try:
@@ -269,5 +263,5 @@ try:
 except:
     print("OpenAI client not set up, OpenAI endpoints will not work.")
 
-MAX_INDEX = 100
+MAX_INDEX = 50
 main()
