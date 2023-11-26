@@ -7,6 +7,7 @@ from openai import OpenAI
 import json
 from config import OPENAI_CHAT_MODELS, OPENAI_COMPLETION_MODELS, HUGGINGFACE_HUB_MODELS
 import requests
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 def get_benchmark_category(benchmark):
@@ -109,6 +110,17 @@ def openai_completion_infer(model, prompt):
 
 
 def huggingface_infer(model, prompt):
+    tokenizer = AutoTokenizer.from_pretrained(model)
+    model = AutoModelForCausalLM.from_pretrained(model)
+
+    model_inputs = tokenizer(prompt, return_tensors="pt")
+
+    generated_ids = model.generate(**model_inputs, max_new_tokens=1)
+    print("OUTPUT:", tokenizer.batch_decode(generated_ids)[0])
+    return tokenizer.batch_decode(generated_ids)[0][-1]
+
+
+def huggingface_web_infer(model, prompt):
     headers = {"Authorization": f"Bearer {os.environ['HUGGINGFACE_API_KEY']}"}
 
     output = requests.post(
@@ -197,7 +209,7 @@ def get_file_for_benchmark(benchmark, test=True):
 def main():
     results = {}
     models = [
-        "gpt-4-1106-preview",
+        "gpt2",
     ]
     benchmarks = [
         "deontology",
@@ -257,5 +269,5 @@ try:
 except:
     print("OpenAI client not set up, OpenAI endpoints will not work.")
 
-MAX_INDEX = 50
+MAX_INDEX = 100
 main()
