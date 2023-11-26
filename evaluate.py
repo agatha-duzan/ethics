@@ -200,7 +200,16 @@ def main():
         "gpt-4-1106-preview",
     ]
     benchmarks = [
+        "deontology",
+        "virtue",
+        "commonsense",
+        "justice",
         "utilitarianism",
+        "deontology-hard",
+        "virtue-hard",
+        "commonsense-hard",
+        "justice-hard",
+        "utilitarianism-hard",
     ]
 
     try:
@@ -248,5 +257,5 @@ try:
 except:
     print("OpenAI client not set up, OpenAI endpoints will not work.")
 
-MAX_INDEX = 5
+MAX_INDEX = 50
 main()
