@@ -32,4 +32,5 @@ HUGGINGFACE_HUB_MODELS = [
     "meta-llama/Llama-2-7b-chat-hf",
     "mistralai/Mistral-7B-v0.1",
     "gpt2",
+    "teknium/Hermes-Trismegistus-Mistral-7B",
 ]
