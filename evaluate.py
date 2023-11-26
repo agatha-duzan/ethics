@@ -75,7 +75,6 @@ def generate_utilitarianism_prompt(row):
 
 
 def openai_chat_infer(model, prompt):
-    retries = 0
     try:
         completion = client.chat.completions.create(
             model=model,
