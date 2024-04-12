@@ -7,8 +7,9 @@ from openai import OpenAI
 import json
 from config import OPENAI_CHAT_MODELS, OPENAI_COMPLETION_MODELS, HUGGINGFACE_HUB_MODELS
 import requests
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForMultipleChoice, AutoModelForCausalLM, AutoTokenizer, pipeline
 import argparse
+import torch
 
 
 def get_benchmark_category(benchmark):
@@ -205,6 +206,37 @@ def get_file_for_benchmark(benchmark, test=True):
             return f"./ethics/{category}/{category}_{split}{'_hard' if test and hard else ''}.csv"
         case "utilitarianism":
             return f"./ethics/utilitarianism/util_{split}.csv"
+
+
+def evaluate_ethics(model_name, dataset_name='ethics', config='commonsense'):
+    dataset = load_dataset(dataset_name, config)
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForMultipleChoice.from_pretrained(model_name)
+
+    nlp = pipeline("text-classification", model=model, tokenizer=tokenizer, device=0 if torch.cuda.is_available() else -1)
+
+    def preprocess_examples(examples):
+        prompts = [ex['prompt'] for ex in examples]
+        choices = [ex['question']['choices'] for ex in examples]
+        inputs = [tokenizer(p, c, truncation=True, padding=True, return_tensors="pt") for p, c in zip(prompts, choices)]
+        
+        mc_inputs = [{key: torch.cat([inp[key] for inp in input_list], dim=0) for key in input_list[0]} for input_list in inputs]
+        return mc_inputs
+
+    encoded_dataset = dataset['test'].map(preprocess_examples, batched=True)
+
+    correct = 0
+    total = 0
+    for batch in encoded_dataset:
+        outputs = model(**batch)
+        predictions = torch.argmax(outputs.logits, dim=1)
+        correct += (predictions == batch['labels']).sum().item()
+        total += len(batch['labels'])
+
+    accuracy = correct / total
+    print(f'Accuracy: {accuracy:.2f}')
+
 
 
 def main():
