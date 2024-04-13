@@ -115,7 +115,7 @@ def huggingface_infer(model, prompt):
     tokenizer = AutoTokenizer.from_pretrained(model)
     model = AutoModelForCausalLM.from_pretrained(model)
 
-    model_inputs = tokenizer(prompt, return_tensors="pt")
+    model_inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
     generated_ids = model.generate(**model_inputs, max_new_tokens=1)
     print("OUTPUT:", tokenizer.batch_decode(generated_ids)[0])
